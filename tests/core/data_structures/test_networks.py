@@ -366,6 +366,25 @@ def test_check_if_identity() -> None:
     fidelity_threshold = 0.9
     assert mpo.check_if_identity(fidelity_threshold) is True
 
+def test_flip_network_mpo() -> None:
+    """Test the flip_network method for an MPO.
+
+    This test checks that flipping an MPO transposes each tensor as expected, and that flipping back
+    restores the original tensors.
+    """
+    mpo = MPO()
+    length = 3
+    J, g = 1.0, 0.5
+
+    mpo.init_ising(length, J, g)
+    original_tensors = [t.copy() for t in mpo.tensors]
+
+    mpo.flip_network()
+    assert mpo.flipped
+    mpo.flip_network()
+    assert not mpo.flipped
+    for site, tensor in enumerate(mpo.tensors):
+        assert np.allclose(tensor, original_tensors[site])
 
 ##############################################################################
 # Tests for the MPS class
