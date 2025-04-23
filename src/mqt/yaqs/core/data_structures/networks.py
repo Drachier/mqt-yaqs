@@ -284,6 +284,9 @@ class MPS:
             current_orthogonality_center (int): current center
             decomposition: Decides between QR or SVD decomposition. QR is faster, SVD allows bond dimension to reduce
                            Default is QR.
+        
+        Raises:
+            ValueError: If the decomposition method is not recognized.
         """
         tensor = self.tensors[current_orthogonality_center]
         if decomposition == "QR":
@@ -291,6 +294,8 @@ class MPS:
         elif decomposition == "SVD":
             site_tensor, s_vec, v_mat = truncated_right_svd(tensor, threshold=1e-15, max_bond_dim=None)
             bond_tensor = np.diag(s_vec) @ v_mat
+        else:
+            raise ValueError("Invalid decomposition method. Use 'QR' or 'SVD'.")
         self.tensors[current_orthogonality_center] = site_tensor
 
         # If normalizing, we just throw away the R

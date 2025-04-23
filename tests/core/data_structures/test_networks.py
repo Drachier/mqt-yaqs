@@ -492,6 +492,14 @@ def test_shift_orthogonality_center_right() -> None:
     mps.shift_orthogonality_center_right(current_orthogonality_center=2)
     assert mps.check_canonical_form() == [3]
 
+def test_shift_orthogonality_center_right_invalid_decomposition() -> None:
+    """Test the raising of an exception when trying to shift the orthogonality center right with an unavailable decomposition."""
+    pdim = 2
+    shapes = [(pdim, 1, 2), (pdim, 2, 3), (pdim, 3, 3), (pdim, 3, 1)]
+    mps = random_mps(shapes)
+    mps.set_canonical_form(0)
+    with pytest.raises(ValueError):
+        mps.shift_orthogonality_center_right(current_orthogonality_center=0, decomposition="Invalid Method")
 
 def test_shift_orthogonality_center_left() -> None:
     """Test shifting the orthogonality center to the left in an MPS.
