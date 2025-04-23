@@ -891,6 +891,7 @@ class MPO:
         Returns:
             NDArray[np.complex128]: The resulting matrix after tensor contractions and reshaping.
         """
+        self.flip_network()
         for i, tensor in enumerate(self.tensors):
             if i == 0:
                 mat = tensor
@@ -899,7 +900,7 @@ class MPO:
                 mat = np.reshape(
                     mat, (mat.shape[0] * mat.shape[1], mat.shape[2] * mat.shape[3], mat.shape[4], mat.shape[5])
                 )
-
+        self.flip_network()
         # Final left and right bonds should be 1
         return np.squeeze(mat, axis=(2, 3))
 
