@@ -48,7 +48,63 @@ from mqt.yaqs.core.methods.tdvp import (
     update_left_environment,
     update_right_environment,
     update_site,
+    initialize_right_environments,
+    initialize_left_environments
 )
+
+def crandn(
+    size: int | tuple[int, ...], *args: int, seed: np.random.Generator | int | None = None
+) -> NDArray[np.complex128]:
+    """Draw random samples from the standard complex normal distribution.
+
+    Args:
+        size (int |Tuple[int,...]): The size/shape of the output array.
+        *args (int): Additional dimensions for the output array.
+        seed (Generator | int): The seed for the random number generator.
+
+    Returns:
+        NDArray[np.complex128]: The array of random complex numbers.
+    """
+    if isinstance(size, int) and len(args) > 0:
+        size = (size, *list(args))
+    elif isinstance(size, int):
+        size = (size,)
+    rng = np.random.default_rng(seed)
+    # 1/sqrt(2) is a normalization factor
+    return (rng.standard_normal(size) + 1j * rng.standard_normal(size)) / np.sqrt(2)
+
+
+def random_mps(shapes: list[tuple[int, int, int]]) -> MPS:
+    """Create a random MPS with the given shapes.
+
+    Args:
+        shapes (List[Tuple[int, int, int]]): The shapes of the tensors in the
+            MPS.
+
+    Returns:
+        MPS: The random MPS.
+    """
+    tensors = [crandn(shape) for shape in shapes]
+    mps = MPS(len(shapes), tensors=tensors)
+    mps.normalize()
+    return mps
+
+
+def random_mpo(shapes: list[tuple[int, int, int, int]]) -> MPO:
+    """Create a random MPO with the given shapes.
+
+    Args:
+        shapes (List[Tuple[int, int, int, int]]): The shapes of the tensors in
+            the MPO.
+
+    Returns:
+        MPO: The random MPO.
+    """
+    tensors = [crandn(shape) for shape in shapes]
+    mpo = MPO()
+    mpo.init_custom(tensors, transpose=False)
+    return mpo
+
 
 rng = np.random.default_rng()
 
@@ -166,6 +222,34 @@ def test_update_left_environment() -> None:
     Rnext = update_left_environment(A, B, W, L_arr)
     assert Rnext.ndim == 3
 
+def test_initialize_left_and_right_envs() -> None:
+    """Test the functions initialising the left and right environments.
+
+    The combination of a left and right environment should simply yield the exectation value of the MPO with respect
+    to the MPS.
+    """
+    pdim = 3
+    shapes = [(pdim, 1, 3), (pdim, 3, 4) , (pdim, 4, 5) , (pdim, 5,1)]
+    mps = random_mps(shapes)
+    shapes = [(pdim, pdim, 1, 4), (pdim, pdim, 4, 6) , (pdim, pdim, 6, 3) , (pdim, pdim, 3,1)]
+    mpo = random_mpo(shapes)
+    ref_mps = deepcopy(mps)
+    ref_mpo = deepcopy(mpo)
+    # Initialize left and right environments
+    left_envs = initialize_left_environments(mps, mpo)
+    assert mps.almost_equal(ref_mps)
+    right_envs = initialize_right_environments(mps, mpo)
+    assert mps.almost_equal(ref_mps)
+    # Reference
+    state = ref_mps.to_vec()
+    operator = ref_mpo.to_matrix()
+    ref_exp_value = state.conj().T @ operator @ state
+    # Calculate the expectation value using the left and right environments
+    for site in range(mps.length - 1): # The trivial ones do not have a fitting partner
+        left_env = left_envs[site+1]
+        right_env = right_envs[site]
+        exp_value = np.tensordot(left_env, right_env, axes=([0, 1, 2], [0, 1, 2])).item()
+        assert np.allclose(exp_value, ref_exp_value)
 
 def test_project_site() -> None:
     """Test the project_site function.

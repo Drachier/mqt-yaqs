@@ -242,13 +242,13 @@ def initialize_right_environments(psi: MPS, op: MPO) -> NDArray[np.complex128]:
         raise ValueError(msg)
 
     right_blocks = [None for _ in range(num_sites)]
-    right_virtual_dim = psi.tensors[num_sites - 1].shape[2]
-    mpo_right_dim = op.tensors[num_sites - 1].shape[3]
+    right_virtual_dim = psi.tensors[-1].shape[2]
+    mpo_right_dim = op.tensors[-1].shape[3]
     right_identity = np.zeros((right_virtual_dim, mpo_right_dim, right_virtual_dim), dtype=complex)
     for i in range(right_virtual_dim):
         for a in range(mpo_right_dim):
             right_identity[i, a, i] = 1
-    right_blocks[num_sites - 1] = right_identity
+    right_blocks[-1] = right_identity
 
     for site in reversed(range(num_sites - 1)):
         right_blocks[site] = update_right_environment(
@@ -256,6 +256,29 @@ def initialize_right_environments(psi: MPS, op: MPO) -> NDArray[np.complex128]:
         )
     return right_blocks
 
+def initialize_left_environments(psi: MPS, op: MPO) -> NDArray[np.complex128]:
+    """Compute the left operator blocks (partial contractions) for the given MPS and MPO.
+
+    Starting from the leftmost site, an identity-like tensor is constructed and then
+    the network is contracted site-by-site moving to the right to produce a list of left operator blocks.
+
+    Args:
+        psi (MPS): The Matrix Product State representing the quantum state.
+        op (MPO): The Matrix Product Operator representing the Hamiltonian.
+
+    Returns:
+        NDArray[np.complex128]: A list (of length equal to the number of sites) containing the left operator blocks.
+
+    Raises:
+        ValueError: If state and operator length does not match.
+    """
+    psi.flip_network()
+    op.flip_network()
+    left_envs = initialize_right_environments(psi, op)
+    left_envs = reversed(left_envs)
+    psi.flip_network()
+    op.flip_network()
+    return list(left_envs)
 
 def project_site(
     left_env: NDArray[np.complex128],
