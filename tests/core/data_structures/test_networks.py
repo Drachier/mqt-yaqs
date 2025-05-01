@@ -366,6 +366,25 @@ def test_check_if_identity() -> None:
     fidelity_threshold = 0.9
     assert mpo.check_if_identity(fidelity_threshold) is True
 
+def test_flip_network_mpo() -> None:
+    """Test the flip_network method for an MPO.
+
+    This test checks that flipping an MPO transposes each tensor as expected, and that flipping back
+    restores the original tensors.
+    """
+    mpo = MPO()
+    length = 3
+    J, g = 1.0, 0.5
+
+    mpo.init_ising(length, J, g)
+    original_tensors = [t.copy() for t in mpo.tensors]
+
+    mpo.flip_network()
+    assert mpo.flipped
+    mpo.flip_network()
+    assert not mpo.flipped
+    for site, tensor in enumerate(mpo.tensors):
+        assert np.allclose(tensor, original_tensors[site])
 
 ##############################################################################
 # Tests for the MPS class
@@ -473,6 +492,14 @@ def test_shift_orthogonality_center_right() -> None:
     mps.shift_orthogonality_center_right(current_orthogonality_center=2)
     assert mps.check_canonical_form() == [3]
 
+def test_shift_orthogonality_center_right_invalid_decomposition() -> None:
+    """Test the raising of an exception when trying to shift the orthogonality center right with an unavailable decomposition."""
+    pdim = 2
+    shapes = [(pdim, 1, 2), (pdim, 2, 3), (pdim, 3, 3), (pdim, 3, 1)]
+    mps = random_mps(shapes)
+    mps.set_canonical_form(0)
+    with pytest.raises(ValueError):
+        mps.shift_orthogonality_center_right(current_orthogonality_center=0, decomposition="Invalid Method")
 
 def test_shift_orthogonality_center_left() -> None:
     """Test shifting the orthogonality center to the left in an MPS.

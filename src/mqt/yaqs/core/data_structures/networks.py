@@ -284,6 +284,9 @@ class MPS:
             current_orthogonality_center (int): current center
             decomposition: Decides between QR or SVD decomposition. QR is faster, SVD allows bond dimension to reduce
                            Default is QR.
+        
+        Raises:
+            ValueError: If the decomposition method is not recognized.
         """
         tensor = self.tensors[current_orthogonality_center]
         if decomposition == "QR":
@@ -291,6 +294,8 @@ class MPS:
         elif decomposition == "SVD":
             site_tensor, s_vec, v_mat = truncated_right_svd(tensor, threshold=1e-15, max_bond_dim=None)
             bond_tensor = np.diag(s_vec) @ v_mat
+        else:
+            raise ValueError("Invalid decomposition method. Use 'QR' or 'SVD'.")
         self.tensors[current_orthogonality_center] = site_tensor
 
         # If normalizing, we just throw away the R
@@ -664,6 +669,13 @@ class MPO:
         Rotates the MPO tensors by swapping physical dimensions.
     """
 
+    def __init__(self) -> None:
+        """Initialize the MPO class."""
+        self.flipped: bool = False
+        self.tensors: list[NDArray[np.complex128]] = []
+        self.length: int = 0
+        self.physical_dimension: int = 0
+
     def init_ising(self, length: int, J: float, g: float) -> None:  # noqa: N803
         """Ising MPO.
 
@@ -879,6 +891,7 @@ class MPO:
         Returns:
             NDArray[np.complex128]: The resulting matrix after tensor contractions and reshaping.
         """
+        self.flip_network()
         for i, tensor in enumerate(self.tensors):
             if i == 0:
                 mat = tensor
@@ -887,7 +900,7 @@ class MPO:
                 mat = np.reshape(
                     mat, (mat.shape[0] * mat.shape[1], mat.shape[2] * mat.shape[3], mat.shape[4], mat.shape[5])
                 )
-
+        self.flip_network()
         # Final left and right bonds should be 1
         return np.squeeze(mat, axis=(2, 3))
 
@@ -947,3 +960,19 @@ class MPO:
                 self.tensors[i] = np.transpose(np.conj(tensor), (1, 0, 2, 3))
             else:
                 self.tensors[i] = np.transpose(tensor, (1, 0, 2, 3))
+
+    def flip_network(self) -> None:
+        """Flip MPO.
+
+        Flips the bond dimensions in the network so that we can do operations
+        from right to left rather than coding it twice.
+
+        """
+        new_tensors = []
+        for tensor in self.tensors:
+            new_tensor = np.transpose(tensor, (0, 1, 3, 2))
+            new_tensors.append(new_tensor)
+
+        new_tensors.reverse()
+        self.tensors = new_tensors
+        self.flipped = not self.flipped
